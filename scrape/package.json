@@ -12,6 +12,7 @@
   "dependencies": {
     "axios": "^0.21.1",
     "cheerio": "*",
-    "lodash.flatten": "^4.4.0"
+    "lodash.flatten": "^4.4.0",
+    "waait": "^1.0.5"
   }
 }

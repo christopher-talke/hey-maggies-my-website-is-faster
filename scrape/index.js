@@ -3,6 +3,7 @@
 import fs from "fs/promises";
 import axios from "axios";
 import cheerio from "cheerio";
+import wait from "waait";
 import flatten from "lodash.flatten";
 
 const WEBSITE = "https://maggiesdogwellness.com";
@@ -39,7 +40,7 @@ async function getAllPages() {
  */
 async function getItemsOnPages(arrayOfEndpoints) {
   async function getItemLinks(collectionEndpoint) {
-    const response = await await axios.get(`${WEBSITE}${collectionEndpoint}`);
+    const response = await axios.get(`${WEBSITE}${collectionEndpoint}`);
     const $ = cheerio.load(response.data, CHEERIO_CONFIG);
 
     const itemLinks = [];
@@ -58,30 +59,61 @@ async function getItemsOnPages(arrayOfEndpoints) {
 }
 
 /**
+ * Iterates through an array of URL's, and gets all of the product details from each
+ * @param {string[]} arrayOfEndpoints An array of strings, which needs to be a http path + query string for the shopify pages
+ * @returns {object[]} array of objects, which are the products with all the meta data
+ */
+async function getProductInformation(arrayOfEndpoints) {
+  const products = [];
+
+  for (const endpoint of arrayOfEndpoints) {
+    console.log(endpoint);
+    await wait(1000);
+    try {
+      const response = await axios.get(`${WEBSITE}${endpoint}`);
+      const $ = cheerio.load(response.data, CHEERIO_CONFIG);
+      const product = $('script[type="application/ld+json"]').first().text();
+      products.push(JSON.parse(product));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  return products;
+}
+
+/**
  * Takes a valid javascript array or object, and writes this to a .json file for local storage
- * @param {array | object} data This can be either an array or object which will be parsed into a JSON string.
+ * @param {string[]|object} data This can be either an array or object which will be parsed into a JSON string.
  * @returns null
  */
 async function writeJsonFile(data) {
-  await fs.writeFile(`data.json`, JSON.stringify(data));
+  await fs.writeFile(`data.json`, JSON.stringify(data, null, 2));
   return;
 }
 
 /**
- * Reads from a .json file, and returns this is a valid javascript array or object.
- * @returns {array | object} A valid javascript array or object.
+ * Reads from a .json file, and returns this as a valid javascript string array or object.
+ * @returns {string[]|object} A valid javascript array or object.
  */
 async function readJsonFIle() {
   const data = await fs.readFile(`data.json`, "utf-8");
   return JSON.parse(data);
 }
+
 /**
  * The pipeline function to pull all of the other functions together.
  */
 async function pipeline() {
   const pages = await getAllPages();
   const items = await getItemsOnPages(pages);
-  await writeJsonFile(items);
+  const products = await getProductInformation(items);
+  const api = {
+    totalProducts: items.length,
+    products,
+  };
+  console.log(api);
+  await writeJsonFile(api);
 }
 
 pipeline();
